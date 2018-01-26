@@ -2446,10 +2446,7 @@ void phNxpNciHal_enable_i2c_fragmentation() {
  *
  ******************************************************************************/
 static void phNxpNciHal_check_factory_reset(void) {
-  struct stat st;
-  int ret = 0;
   NFCSTATUS status = NFCSTATUS_FAILED;
-  const char config_eseinfo_path[] = "/data/nfc/nfaStorage.bin1";
   static uint8_t reset_ese_session_identity_set[] = {
       0x20, 0x02, 0x17, 0x02, 0xA0, 0xEA, 0x08, 0xFF, 0xFF,
       0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xA0, 0xEB, 0x08,
@@ -2458,36 +2455,28 @@ static void phNxpNciHal_check_factory_reset(void) {
   static uint8_t reset_ese_session_identity[] = {0x20, 0x03, 0x05, 0x02,
                                                  0xA0, 0xEA, 0xA0, 0xEB};
 #endif
-  if (stat(config_eseinfo_path, &st) == -1) {
-    NXPLOG_NCIHAL_D("%s file not present = %s", __func__, config_eseinfo_path);
-    ret = -1;
-  } else {
-    ret = 0;
-  }
 
-  if (ret == -1) {
 #ifdef PN547C2_FACTORY_RESET_DEBUG
-    /* NXP ACT Proprietary Ext */
-    status = phNxpNciHal_send_ext_cmd(sizeof(reset_ese_session_identity),
-                                      reset_ese_session_identity);
-    if (status != NFCSTATUS_SUCCESS) {
-      NXPLOG_NCIHAL_E("NXP reset_ese_session_identity command failed");
-    }
-#endif
-    status = phNxpNciHal_send_ext_cmd(sizeof(reset_ese_session_identity_set),
-                                      reset_ese_session_identity_set);
-    if (status != NFCSTATUS_SUCCESS) {
-      NXPLOG_NCIHAL_E("NXP reset_ese_session_identity_set command failed");
-    }
-#ifdef PN547C2_FACTORY_RESET_DEBUG
-    /* NXP ACT Proprietary Ext */
-    status = phNxpNciHal_send_ext_cmd(sizeof(reset_ese_session_identity),
-                                      reset_ese_session_identity);
-    if (status != NFCSTATUS_SUCCESS) {
-      NXPLOG_NCIHAL_E("NXP reset_ese_session_identity command failed");
-    }
-#endif
+  /* NXP ACT Proprietary Ext */
+  status = phNxpNciHal_send_ext_cmd(sizeof(reset_ese_session_identity),
+                                    reset_ese_session_identity);
+  if (status != NFCSTATUS_SUCCESS) {
+    NXPLOG_NCIHAL_E("NXP reset_ese_session_identity command failed");
   }
+#endif
+  status = phNxpNciHal_send_ext_cmd(sizeof(reset_ese_session_identity_set),
+                                    reset_ese_session_identity_set);
+  if (status != NFCSTATUS_SUCCESS) {
+    NXPLOG_NCIHAL_E("NXP reset_ese_session_identity_set command failed");
+  }
+#ifdef PN547C2_FACTORY_RESET_DEBUG
+  /* NXP ACT Proprietary Ext */
+  status = phNxpNciHal_send_ext_cmd(sizeof(reset_ese_session_identity),
+                                    reset_ese_session_identity);
+  if (status != NFCSTATUS_SUCCESS) {
+    NXPLOG_NCIHAL_E("NXP reset_ese_session_identity command failed");
+  }
+#endif
 }
 
 /******************************************************************************
