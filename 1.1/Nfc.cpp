@@ -131,6 +131,13 @@ Return<V1_0::NfcStatus> Nfc::closeForPowerOffCase() {
   return CHK_STATUS(status);
 }
 
+Return<void> Nfc::getConfig(getConfig_cb hidl_cb) {
+  NfcConfig nfcVendorConfig;
+  phNxpNciHal_getVendorConfig(nfcVendorConfig);
+  hidl_cb(nfcVendorConfig);
+  return Void();
+}
+
 }  // namespace implementation
 }  // namespace V1_1
 }  // namespace nfc

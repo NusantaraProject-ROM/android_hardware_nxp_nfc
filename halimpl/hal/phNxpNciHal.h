@@ -51,6 +51,8 @@ typedef void(phNxpNciHal_control_granted_callback_t)();
 #define NCI_OID_MASK 0x3F
 #define NXP_NFC_CHIP_PN81T
 
+#define NXP_MAX_CONFIG_STRING_LEN 260
+
 typedef struct nci_data {
   uint16_t len;
   uint8_t p_data[NCI_MAX_DATA_LEN];
