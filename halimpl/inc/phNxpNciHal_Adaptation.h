@@ -18,6 +18,10 @@
 #define _PHNXPNCIHAL_ADAPTATION_H_
 
 #include <hardware/nfc.h>
+#include <android/hardware/nfc/1.1/INfc.h>
+#include <android/hardware/nfc/1.1/types.h>
+
+using ::android::hardware::nfc::V1_1::NfcConfig;
 
 typedef struct {
   struct nfc_nci_device nci_device;
@@ -38,4 +42,5 @@ int phNxpNciHal_control_granted(void);
 int phNxpNciHal_power_cycle(void);
 int phNxpNciHal_ioctl(long arg, void* p_data);
 void phNxpNciHal_do_factory_reset(void);
+void phNxpNciHal_getVendorConfig(NfcConfig& config);
 #endif /* _PHNXPNCIHAL_ADAPTATION_H_ */
