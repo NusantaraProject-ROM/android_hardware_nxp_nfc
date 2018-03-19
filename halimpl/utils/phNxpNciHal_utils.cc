@@ -23,7 +23,6 @@
 #include <phNxpNciHal.h>
 #include <phNxpNciHal_utils.h>
 
-
 /*********************** Link list functions **********************************/
 
 /*******************************************************************************
@@ -338,10 +337,9 @@ void phNxpNciHal_cleanup_monitor(void) {
 **
 *******************************************************************************/
 phNxpNciHal_Monitor_t* phNxpNciHal_get_monitor(void) {
- if(nxpncihal_monitor == NULL)
- {
+  if (nxpncihal_monitor == NULL) {
     NXPLOG_NCIHAL_E("nxpncihal_monitor is null");
- }
+  }
   return nxpncihal_monitor;
 }
 
