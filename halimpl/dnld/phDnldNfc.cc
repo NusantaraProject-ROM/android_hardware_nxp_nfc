@@ -28,9 +28,7 @@
 static void* pFwHandle; /* Global firmware handle */
 uint16_t wMwVer = 0; /* Middleware version no */
 uint16_t wFwVer = 0; /* Firmware version no */
-#if (NFC_NXP_CHIP_TYPE != PN547C2)
 uint8_t gRecFWDwnld;  // flag set to true to indicate dummy FW download
-#endif
 phTmlNfc_i2cfragmentation_t fragmentation_enabled = I2C_FRAGMENATATION_DISABLED;
 static pphDnldNfc_DlContext_t gpphDnldContext = NULL; /* Download contex */
 #undef EEPROM_Read_Mem_IMP
@@ -247,8 +245,6 @@ NFCSTATUS phDnldNfc_CheckIntegrity(uint8_t bChipVer, pphDnldNfc_Buff_t pCRCData,
           (PHDNLDNFC_HWVER_MRA2_2 == bChipVer)
 #if (NFC_NXP_CHIP_TYPE == PN551)
           || (PHDNLDNFC_HWVER_PN551_MRA1_0 == bChipVer)
-#elif (NFC_NXP_CHIP_TYPE == PN548C2)
-          || (PHDNLDNFC_HWVER_PN548AD_MRA1_0 == bChipVer)
 #elif (NFC_NXP_CHIP_TYPE == PN553 || NFC_NXP_CHIP_TYPE == PN557)
           || (PHDNLDNFC_HWVER_PN553_MRA1_0 == bChipVer) ||
           (PHDNLDNFC_HWVER_PN553_MRA1_0_UPDATED & bChipVer) ||
@@ -767,11 +763,9 @@ NFCSTATUS phDnldNfc_InitImgInfo(void) {
 
   if(gpphDnldContext->FwFormat == FW_FORMAT_SO) {
   /* load the library and get the image info pointer */
-#if (NFC_NXP_CHIP_TYPE != PN547C2)
   if (gRecFWDwnld == true)
     wStatus = phDnldNfc_LoadRecoveryFW(fwFullPath, &pImageInfo, &ImageInfoLen);
   else
-#endif
     wStatus = phDnldNfc_LoadFW(fwFullPath, &pImageInfo, &ImageInfoLen);
   } else if(gpphDnldContext->FwFormat == FW_FORMAT_BIN) {
       wStatus = phDnldNfc_LoadBinFW(fwFullPath, &pImageInfo, &ImageInfoLen);
@@ -846,12 +840,10 @@ NFCSTATUS phDnldNfc_LoadRecInfo(void) {
   /* if memory is not allocated then allocate memory for donwload context
    * structure */
   phDnldNfc_SetHwDevHandle();
-#if (NFC_NXP_CHIP_TYPE != PN547C2)
   if (gRecFWDwnld == true)
     wStatus =
         phDnldNfc_LoadRecoveryFW(PLATFORM_LIB_PATH, &pImageInfo, &ImageInfoLen);
   else
-#endif
     wStatus = phDnldNfc_LoadFW(PLATFORM_LIB_PATH, &pImageInfo, &ImageInfoLen);
   if ((pImageInfo == NULL) || (ImageInfoLen == 0)) {
     NXPLOG_FWDNLD_E(
@@ -905,12 +897,10 @@ NFCSTATUS phDnldNfc_LoadPKInfo(void) {
   phDnldNfc_SetHwDevHandle();
 
 /* load the PKU image library */
-#if (NFC_NXP_CHIP_TYPE != PN547C2)
   if (gRecFWDwnld == true)
     wStatus =
         phDnldNfc_LoadRecoveryFW(PKU_LIB_PATH, &pImageInfo, &ImageInfoLen);
   else
-#endif
     wStatus = phDnldNfc_LoadFW(PKU_LIB_PATH, &pImageInfo, &ImageInfoLen);
   if ((pImageInfo == NULL) || (ImageInfoLen == 0)) {
     NXPLOG_FWDNLD_E(
@@ -989,16 +979,12 @@ NFCSTATUS phDnldNfc_LoadFW(const char* pathName, uint8_t** pImgInfo,
   void* pImageInfo = NULL;
   void* pImageInfoLen = NULL;
   if (pathName == NULL) {
-#if (NFC_NXP_CHIP_TYPE == PN548C2)
-    pathName = "/system/vendor/lib/libpn548ad_fw.so";
-#elif (NFC_NXP_CHIP_TYPE == PN551)
+#if (NFC_NXP_CHIP_TYPE == PN551)
     pathName = "/system/vendor/lib/libpn551_fw.so";
 #elif (NFC_NXP_CHIP_TYPE == PN553)
     pathName = "/system/vendor/lib/libpn553_fw.so";
 #elif (NFC_NXP_CHIP_TYPE == PN557)
     pathName = "/system/vendor/lib/libpn557_fw.so";
-#else
-    pathName = "/system/vendor/lib/libpn547_fw.so";
 #endif
   }
 
@@ -1124,7 +1110,6 @@ NFCSTATUS phDnldNfc_LoadBinFW(const char* pathName, uint8_t **pImgInfo,
   return NFCSTATUS_SUCCESS;
 }
 
-#if (NFC_NXP_CHIP_TYPE != PN547C2)
 /*******************************************************************************
 **
 ** Function         phDnldNfc_LoadRecoveryFW
@@ -1147,16 +1132,12 @@ NFCSTATUS phDnldNfc_LoadRecoveryFW(const char* pathName, uint8_t** pImgInfo,
 
   /* check for path name */
   if (pathName == NULL) {
-#if (NFC_NXP_CHIP_TYPE == PN548C2)
-    pathName = "/system/vendor/lib/libpn548ad_fw.so";
-#elif (NFC_NXP_CHIP_TYPE == PN551)
+#if (NFC_NXP_CHIP_TYPE == PN551)
     pathName = "/system/vendor/lib/libpn551_fw.so";
 #elif (NFC_NXP_CHIP_TYPE == PN553)
     pathName = "/system/vendor/lib/libpn553_fw.so";
 #elif(NFC_NXP_CHIP_TYPE == PN557)
     pathName = "/system/vendor/lib/libpn557_fw.so";
-#else
-    pathName = "/system/vendor/lib/libpn547_fw.so";
 #endif
   }
 
@@ -1197,7 +1178,6 @@ NFCSTATUS phDnldNfc_LoadRecoveryFW(const char* pathName, uint8_t** pImgInfo,
 
   return NFCSTATUS_SUCCESS;
 }
-#endif
 
 /*******************************************************************************
 **
