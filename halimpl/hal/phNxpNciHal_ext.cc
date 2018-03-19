@@ -395,6 +395,7 @@ NFCSTATUS phNxpNciHal_process_ext_rsp(uint8_t* p_ntf, uint16_t* p_len) {
 static NFCSTATUS phNxpNciHal_ext_process_nfc_init_rsp(uint8_t* p_ntf,
                                                       uint16_t* p_len) {
   NFCSTATUS status = NFCSTATUS_SUCCESS;
+
   /* Parsing CORE_RESET_RSP and CORE_RESET_NTF to update NCI version.*/
   if (p_ntf == NULL || *p_len == 0x00) {
     return NFCSTATUS_FAILED;
@@ -416,6 +417,10 @@ static NFCSTATUS phNxpNciHal_ext_process_nfc_init_rsp(uint8_t* p_ntf,
         p_ntf[3] == CORE_RESET_TRIGGER_TYPE_POWERED_ON) {
       NXPLOG_NCIHAL_D("CORE_RESET_NTF NCI2.0 reason CORE_RESET_CMD received !");
       nxpncihal_ctrl.nci_info.nci_version = p_ntf[5];
+      NXPLOG_NCIHAL_D("nci_version : 0x%02x",nxpncihal_ctrl.nci_info.nci_version);
+      if(!nxpncihal_ctrl.hal_open_status) {
+        phNxpNciHal_configFeatureList(p_ntf,*p_len);
+      }
       int len = p_ntf[2] + 2; /*include 2 byte header*/
       wFwVerRsp = (((uint32_t)p_ntf[len - 2]) << 16U) |
                   (((uint32_t)p_ntf[len - 1]) << 8U) | p_ntf[len];
@@ -442,6 +447,9 @@ static NFCSTATUS phNxpNciHal_ext_process_nfc_init_rsp(uint8_t* p_ntf,
       NXPLOG_NCIHAL_D("CORE_INIT_RSP NCI2.0 received !");
     } else {
       NXPLOG_NCIHAL_D("CORE_INIT_RSP NCI1.0 received !");
+      if(!nxpncihal_ctrl.hal_open_status) {
+        phNxpNciHal_configFeatureList(p_ntf,*p_len);
+      }
       int len = p_ntf[2] + 2; /*include 2 byte header*/
       wFwVerRsp = (((uint32_t)p_ntf[len - 2]) << 16U) |
                   (((uint32_t)p_ntf[len - 1]) << 8U) | p_ntf[len];

@@ -37,22 +37,7 @@ using namespace android::hardware::nfc::V1_1;
 #define PN547C2_CLOCK_SETTING
 #undef PN547C2_FACTORY_RESET_DEBUG
 #define CORE_RES_STATUS_BYTE 3
-/* FW Mobile major number */
-#define FW_MOBILE_MAJOR_NUMBER_PN553 0x01
-#define FW_MOBILE_MAJOR_NUMBER_PN81A 0x02
-#define FW_MOBILE_MAJOR_NUMBER_PN551 0x05
-#define FW_MOBILE_MAJOR_NUMBER_PN48AD 0x01
-#define FW_MOBILE_MAJOR_NUMBER_PN557 0x01
 
-#if (NFC_NXP_CHIP_TYPE == PN551)
-#define FW_MOBILE_MAJOR_NUMBER FW_MOBILE_MAJOR_NUMBER_PN551
-#elif (NFC_NXP_CHIP_TYPE == PN553)
-#define FW_MOBILE_MAJOR_NUMBER FW_MOBILE_MAJOR_NUMBER_PN553
-#elif(NFC_NXP_CHIP_TYPE == PN557)
-#define FW_MOBILE_MAJOR_NUMBER FW_MOBILE_MAJOR_NUMBER_PN557
-#else
-#define FW_MOBILE_MAJOR_NUMBER FW_MOBILE_MAJOR_NUMBER_PN48AD
-#endif
 /* Processing of ISO 15693 EOF */
 extern uint8_t icode_send_eof;
 extern uint8_t icode_detected;
@@ -348,20 +333,9 @@ static NFCSTATUS phNxpNciHal_CheckValidFwVersion(void) {
   /* extract the firmware's major no */
   ufw_current_major_no = ((0x00FF) & (wFwVer >> 8U));
 
-  NXPLOG_NCIHAL_D("%s current_major_no = 0x%x", __FUNCTION__,
-                  ufw_current_major_no);
-  if ((ufw_current_major_no == FW_MOBILE_MAJOR_NUMBER) ||
-      ((ufw_current_major_no == FW_MOBILE_MAJOR_NUMBER_PN81A &&
+  if ((ufw_current_major_no == nfcFL._FW_MOBILE_MAJOR_NUMBER) ||
+      ((ufw_current_major_no == FW_MOBILE_MAJOR_NUMBER_PN81A) &&
         (nxpncihal_ctrl.nci_info.nci_version == NCI_VERSION_2_0)))
-#if (NFC_NXP_CHIP_TYPE == PN553)
-      || ((rom_version == 0x00) &&
-          (ufw_current_major_no == FW_MOBILE_MAJOR_NUMBER_PN81A))
-#elif (NFC_NXP_CHIP_TYPE == PN557)
-      || ((rom_version == FW_MOBILE_MAJOR_NUMBER) &&
-          (ufw_current_major_no == FW_MOBILE_MAJOR_NUMBER_PN557))
-#endif
-          )
-
   {
     status = NFCSTATUS_SUCCESS;
   } else if (ufw_current_major_no == sfw_infra_major_no) {
@@ -614,17 +588,17 @@ init_retry:
     goto clean_and_return;
   }
 
-  status = phNxpNciHal_send_ext_cmd(sizeof(cmd_init_nci2_0), cmd_init_nci2_0);
-  if (status == NFCSTATUS_SUCCESS) {
-    if (nxpncihal_ctrl.nci_info.nci_version != NCI_VERSION_2_0) {
-      NXPLOG_NCIHAL_E("Chip is in NCI1.0 mode reset the chip again");
+  if(nxpncihal_ctrl.nci_info.nci_version == NCI_VERSION_2_0) {
+    status = phNxpNciHal_send_ext_cmd(sizeof(cmd_init_nci2_0), cmd_init_nci2_0);
+  } else {
+    status = phNxpNciHal_send_ext_cmd(sizeof(cmd_init_nci), cmd_init_nci);
+    if(status == NFCSTATUS_SUCCESS && (nfcFL.chipType == pn557)) {
+      NXPLOG_NCIHAL_E("Chip is in NCI1.0 mode reset the chip to 2.0 mode");
       status = phNxpNciHal_send_ext_cmd(sizeof(cmd_reset_nci), cmd_reset_nci);
-      if (status == NFCSTATUS_SUCCESS) {
-        if (nxpncihal_ctrl.nci_info.nci_version == NCI_VERSION_2_0) {
-          status = phNxpNciHal_send_ext_cmd(sizeof(cmd_init_nci2_0),
-                                            cmd_init_nci2_0);
-        } else {
-          status = phNxpNciHal_send_ext_cmd(sizeof(cmd_init_nci), cmd_init_nci);
+      if(status == NFCSTATUS_SUCCESS) {
+        status = phNxpNciHal_send_ext_cmd(sizeof(cmd_init_nci2_0), cmd_init_nci2_0);
+        if(status == NFCSTATUS_SUCCESS) {
+          goto init_retry;
         }
       }
     }
@@ -778,15 +752,15 @@ clean_and_return:
  ******************************************************************************/
 int phNxpNciHal_fw_mw_ver_check() {
   NFCSTATUS status = NFCSTATUS_FAILED;
-  if (!(strcmp(COMPILATION_MW, "PN557")) &&
+  if ((nfcFL.chipType == pn557) &&
       (rom_version == FW_MOBILE_ROM_VERSION_PN557) &&
       (fw_maj_ver == 0x01)) {
     status = NFCSTATUS_SUCCESS;
-  } else if (!(strcmp(COMPILATION_MW, "PN553")) &&
+  } else if ((nfcFL.chipType == pn553) &&
       (rom_version == FW_MOBILE_ROM_VERSION_PN553) &&
       (fw_maj_ver == 0x01 || fw_maj_ver == 0x02)) {
     status = NFCSTATUS_SUCCESS;
-  } else if (!strcmp(COMPILATION_MW, "PN551") &&
+  } else if ((nfcFL.chipType == pn551) &&
              (rom_version == FW_MOBILE_ROM_VERSION_PN551) &&
              (fw_maj_ver == 0x05)) {
     status = NFCSTATUS_SUCCESS;
@@ -1152,10 +1126,8 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
   static uint8_t cmd_ven_enable[] = {0x20, 0x02, 0x05, 0x01,
                                          0xA0, 0x07, 0x01, 0x01};
 
-#ifndef NXP_NFC_CHIP_PN81T
   static uint8_t android_l_aid_matching_mode_on_cmd[] = {
       0x20, 0x02, 0x05, 0x01, 0xA0, 0x91, 0x01, 0x01};
-#endif
   static uint8_t swp_switch_timeout_cmd[] = {0x20, 0x02, 0x06, 0x01, 0xA0,
                                              0xF3, 0x02, 0x00, 0x00};
   config_success = true;
@@ -1677,9 +1649,8 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
     }
   }
 
-#ifndef NXP_NFC_CHIP_PN81T
   /* Android L AID Matching Platform Setting*/
-  if (GetNxpNumValue(NAME_AID_MATCHING_PLATFORM, (void*)&retlen,
+  if ((nfcFL.chipType != pn557) && GetNxpNumValue(NAME_AID_MATCHING_PLATFORM, (void*)&retlen,
                      sizeof(retlen))) {
     if (1 == retlen) {
       status =
@@ -1702,7 +1673,6 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
       }
     }
   }
-#endif
 
   if ((*p_core_init_rsp_params > 0) && (*p_core_init_rsp_params < 4)) {
     static phLibNfc_Message_t msg;
@@ -2528,12 +2498,11 @@ retrySetclock:
   if (nxpprofile_ctrl.bClkSrcVal == CLK_SRC_PLL) {
     static uint8_t set_clock_cmd[] = {0x20, 0x02, 0x09, 0x02, 0xA0, 0x03,
                                       0x01, 0x11, 0xA0, 0x04, 0x01, 0x01};
-#if (NFC_NXP_CHIP_TYPE == PN553 || NFC_NXP_CHIP_TYPE == PN557)
     uint8_t param_clock_src = 0x00;
-#else
-    uint8_t param_clock_src = CLK_SRC_PLL;
-    param_clock_src = param_clock_src << 3;
-#endif
+    if((nfcFL.chipType != pn553)&&(nfcFL.chipType != pn557)) {
+      uint8_t param_clock_src = CLK_SRC_PLL;
+      param_clock_src = param_clock_src << 3;
+    }
 
     if (nxpprofile_ctrl.bClkFreqVal == CLK_FREQ_13MHZ) {
       param_clock_src |= 0x00;
@@ -2549,11 +2518,11 @@ retrySetclock:
       param_clock_src |= 0x05;
     } else {
       NXPLOG_NCIHAL_E("Wrong clock freq, send default PLL@19.2MHz");
-#if (NFC_NXP_CHIP_TYPE == PN553 || NFC_NXP_CHIP_TYPE == PN557)
-      param_clock_src = 0x01;
-#else
-      param_clock_src = 0x11;
-#endif
+      if((nfcFL.chipType == pn553) || (nfcFL.chipType == pn557)) {
+        param_clock_src = 0x01;
+      } else {
+        param_clock_src = 0x11;
+      }
     }
 
     set_clock_cmd[7] = param_clock_src;
@@ -2749,9 +2718,9 @@ static void phNxpNciHal_gpio_restore(phNxpNciHal_GpioInfoState state) {
 int check_config_parameter() {
   uint8_t param_clock_src = CLK_SRC_PLL;
   if (nxpprofile_ctrl.bClkSrcVal == CLK_SRC_PLL) {
-#if (NFC_NXP_CHIP_TYPE != PN553 && NFC_NXP_CHIP_TYPE != PN557)
-    param_clock_src = param_clock_src << 3;
-#endif
+    if((nfcFL.chipType != pn553)&&(nfcFL.chipType != pn557)) {
+      param_clock_src = param_clock_src << 3;
+    }
     if (nxpprofile_ctrl.bClkFreqVal == CLK_FREQ_13MHZ) {
       param_clock_src |= 0x00;
     } else if (nxpprofile_ctrl.bClkFreqVal == CLK_FREQ_19_2MHZ) {
@@ -2914,6 +2883,26 @@ static void phNxpNciHal_check_factory_reset(void) {
       NXPLOG_NCIHAL_E("NXP reset_ese_session_identity command failed");
     }
 #endif
+}
+
+/*******************************************************************************
+**
+** Function         phNxpNciHal_configFeatureList
+**
+** Description      Configures the featureList based on chip type
+**                  HW Version information number will provide chipType.
+**                  HW Version can be obtained from CORE_INIT_RESPONSE(NCI 1.0)
+**                  or CORE_RST_NTF(NCI 2.0)
+**
+** Parameters       CORE_INIT_RESPONSE/CORE_RST_NTF, len
+**
+** Returns          none
+*******************************************************************************/
+void phNxpNciHal_configFeatureList(uint8_t* init_rsp, uint16_t rsp_len) {
+    nxpncihal_ctrl.chipType = pConfigFL->processChipType(init_rsp,rsp_len);
+    tNFC_chipType chipType = nxpncihal_ctrl.chipType;
+    CONFIGURE_FEATURELIST(chipType);
+    NXPLOG_NCIHAL_D("NFC_GetFeatureList ()chipType = %d", chipType);
 }
 
 /******************************************************************************
