@@ -43,9 +43,6 @@ typedef void (*pphDnldNfc_RspCb_t)(void* pContext, NFCSTATUS wStatus,
 #define PHDNLDNFC_HWVER_MRA2_1 (0x04U) /* ChipVersion MRA2.1 */
 #define PHDNLDNFC_HWVER_MRA2_2 (0x05U) /* ChipVersion MRA2.2 */
 
-/* PN548AD ChipVersion MRA1.0 */
-#define PHDNLDNFC_HWVER_PN548AD_MRA1_0 (0x08U)
-
 /* PN551 ChipVersion MRA1.0 */
 #define PHDNLDNFC_HWVER_PN551_MRA1_0 (0x08U)
 /* PN553-NCI1.0 ChipVersion MRA1.0 */
@@ -135,10 +132,8 @@ extern NFCSTATUS phDnldNfc_LoadFW(const char* pathName, uint8_t** pImgInfo,
                                   uint16_t* pImgInfoLen);
 extern NFCSTATUS phDnldNfc_LoadBinFW(const char* pathName, uint8_t** pImgInfo,
                                      uint16_t* pImgInfoLen);
-#if (NFC_NXP_CHIP_TYPE != PN547C2)
 extern NFCSTATUS phDnldNfc_LoadRecoveryFW(const char* pathName,
                                           uint8_t** pImgInfo,
                                           uint16_t* pImgInfoLen);
-#endif
 extern NFCSTATUS phDnldNfc_UnloadFW(void);
 #endif /* PHDNLDNFC_H */

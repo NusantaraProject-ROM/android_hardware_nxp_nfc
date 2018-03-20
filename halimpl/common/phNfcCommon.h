@@ -36,16 +36,7 @@
 #define FW_DLL_ROOT_DIR "/system/vendor/lib/"
 #define FW_DLL_EXTENSION ".so"
 
-#if (NFC_NXP_CHIP_TYPE == PN548C2)
-
-/* Actual FW library name*/
-#define FW_LIB_PATH FW_DLL_ROOT_DIR "libpn548ad_fw" FW_DLL_EXTENSION
-/* Restore Corrupted PLL Setttings/etc */
-#define PLATFORM_LIB_PATH \
-  FW_DLL_ROOT_DIR "libpn548ad_fw_platform" FW_DLL_EXTENSION
-/* Upgrade the public Key */
-#define PKU_LIB_PATH FW_DLL_ROOT_DIR "libpn548ad_fw_pku" FW_DLL_EXTENSION
-#elif(NFC_NXP_CHIP_TYPE == PN551)
+#if(NFC_NXP_CHIP_TYPE == PN551)
 /* Actual FW library name*/
 #define FW_LIB_PATH FLASH_CONF_ROOT_DIR "libpn551_fw" FW_DLL_EXTENSION
 /* Restore Corrupted PLL Settings/etc */
@@ -61,28 +52,23 @@
   FW_DLL_ROOT_DIR "libpn553_fw_platform" FW_DLL_EXTENSION
 /* Upgrade the public Key */
 #define PKU_LIB_PATH FW_DLL_ROOT_DIR "libpn553_fw_pku" FW_DLL_EXTENSION
-#else
+#elif(NFC_NXP_CHIP_TYPE == PN557)
 /* Actual FW library name*/
-#define FW_LIB_PATH FW_DLL_ROOT_DIR "libpn547_fw" FW_DLL_EXTENSION
+#define FW_LIB_PATH FLASH_CONF_ROOT_DIR "libpn557_fw" FW_DLL_EXTENSION
 /* Restore Corrupted PLL Settings/etc */
 #define PLATFORM_LIB_PATH \
-  FW_DLL_ROOT_DIR "libpn547_fw_platform" FW_DLL_EXTENSION
+FW_DLL_ROOT_DIR "libpn557_fw_platform" FW_DLL_EXTENSION
 /* Upgrade the public Key */
-#define PKU_LIB_PATH FW_DLL_ROOT_DIR "libpn547_fw_pku" FW_DLL_EXTENSION
+#define PKU_LIB_PATH FW_DLL_ROOT_DIR "libpn557_fw_pku" FW_DLL_EXTENSION
 #endif
 
-#if (NFC_NXP_CHIP_TYPE == PN548C2)
-#define COMPILATION_MW "PN548C2"
-#elif(NFC_NXP_CHIP_TYPE == PN551)
+#if(NFC_NXP_CHIP_TYPE == PN551)
 #define COMPILATION_MW "PN551"
 #elif(NFC_NXP_CHIP_TYPE == PN553)
 #define COMPILATION_MW "PN553"
 #elif(NFC_NXP_CHIP_TYPE == PN557)
 #define COMPILATION_MW "PN557"
-#else
-#define COMPILATION_MW "PN547C2"
 #endif
-
 /* HAL Version number (Updated as per release) */
 #define NXP_MW_VERSION_MAJ (3U)
 #define NXP_MW_VERSION_MIN (5U)
