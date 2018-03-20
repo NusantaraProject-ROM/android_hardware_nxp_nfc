@@ -35,9 +35,7 @@
 /* External global variable to get FW version */
 extern uint16_t wFwVer;
 extern uint16_t wMwVer;
-#if (NFC_NXP_CHIP_TYPE != PN547C2)
 extern uint8_t gRecFWDwnld;
-#endif
 /* RF Configuration structure */
 typedef struct phLibNfc_IoctlSetRfConfig {
   uint8_t bNumOfParams;   /* Number of Rf configurable parameters to be set */
@@ -178,10 +176,6 @@ static NFCSTATUS phNxpNciHal_fw_seq_handler(
 static NFCSTATUS (*phNxpNciHal_dwnld_seqhandler[])(void* pContext,
                                                    NFCSTATUS status,
                                                    void* pInfo) = {
-#if (NFC_NXP_CHIP_TYPE == PN547C2)
-    phNxpNciHal_fw_dnld_normal,
-    phNxpNciHal_fw_dnld_normal,
-#endif
     phNxpNciHal_fw_dnld_get_sessn_state,
     phNxpNciHal_fw_dnld_get_version,
     phNxpNciHal_fw_dnld_log_read,
@@ -192,7 +186,6 @@ static NFCSTATUS (*phNxpNciHal_dwnld_seqhandler[])(void* pContext,
     phNxpNciHal_fw_dnld_chk_integrity,
     NULL};
 
-#if (NFC_NXP_CHIP_TYPE != PN547C2)
 /* Array of pointers to start dummy fw download seq */
 static NFCSTATUS (*phNxpNciHal_dummy_rec_dwnld_seqhandler[])(void* pContext,
                                                              NFCSTATUS status,
@@ -204,7 +197,6 @@ static NFCSTATUS (*phNxpNciHal_dummy_rec_dwnld_seqhandler[])(void* pContext,
     phNxpNciHal_fw_dnld_log_read,
     phNxpNciHal_fw_dnld_write,
     NULL};
-#endif
 
 /* Download Recovery Sequence */
 static NFCSTATUS (*phNxpNciHal_dwnld_rec_seqhandler[])(void* pContext,
@@ -541,8 +533,6 @@ static void phNxpNciHal_fw_dnld_get_version_cb(void* pContext, NFCSTATUS status,
           (PHDNLDNFC_HWVER_MRA2_2 == bHwVer)
 #if (NFC_NXP_CHIP_TYPE == PN551)
           || (PHDNLDNFC_HWVER_PN551_MRA1_0 == bHwVer)
-#elif (NFC_NXP_CHIP_TYPE == PN548C2)
-          || (PHDNLDNFC_HWVER_PN548AD_MRA1_0 == bHwVer)
 #elif(NFC_NXP_CHIP_TYPE == PN553 || NFC_NXP_CHIP_TYPE == PN557)
           || (PHDNLDNFC_HWVER_PN553_MRA1_0 == bHwVer ||
               PHDNLDNFC_HWVER_PN553_MRA1_0_UPDATED & pRespBuff->pBuff[0])
@@ -1719,12 +1709,10 @@ NFCSTATUS phNxpNciHal_fw_download_seq(uint8_t bClkSrcVal, uint8_t bClkFreqVal) {
   /* Get firmware version */
   if (NFCSTATUS_SUCCESS == phDnldNfc_InitImgInfo()) {
     NXPLOG_FWDNLD_D("phDnldNfc_InitImgInfo:SUCCESS");
-#if (NFC_NXP_CHIP_TYPE != PN547C2)
     if (gRecFWDwnld == true) {
       status =
           phNxpNciHal_fw_seq_handler(phNxpNciHal_dummy_rec_dwnld_seqhandler);
     } else
-#endif
     {
       status = phNxpNciHal_fw_seq_handler(phNxpNciHal_dwnld_seqhandler);
     }
