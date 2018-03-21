@@ -475,6 +475,7 @@ int phNxpNciHal_MinOpen (){
   int init_retry_cnt = 0;
   int8_t ret_val = 0x00;
 
+  phNxpNciHal_initialize_debug_enabled_flag();
   /* initialize trace level */
   phNxpLog_InitializeLogLevel();
 
@@ -714,7 +715,6 @@ int phNxpNciHal_open(nfc_stack_callback_t* p_cback,
   NFCSTATUS wConfigStatus = NFCSTATUS_SUCCESS;
   NFCSTATUS status = NFCSTATUS_SUCCESS;
 
-  phNxpNciHal_initialize_debug_enabled_flag();
   if (nxpncihal_ctrl.halStatus == HAL_STATUS_OPEN) {
     NXPLOG_NCIHAL_E("phNxpNciHal_open already open");
     return NFCSTATUS_SUCCESS;
