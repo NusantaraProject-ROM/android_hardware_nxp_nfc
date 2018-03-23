@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "Nxp_Features.h"
 
 #ifndef TRUE
 #define TRUE (0x01) /* Logical True Value */

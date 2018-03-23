@@ -120,8 +120,8 @@ typedef enum {
  */
 typedef enum phDnldNfc_FwFormat {
   FW_FORMAT_UNKNOWN = 0x00,
-  FW_FORMAT_BIN = 0x01,
-  FW_FORMAT_SO = 0x02,
+  FW_FORMAT_SO = 0x01,
+  FW_FORMAT_BIN = 0x02,
 } phDnldNfc_FwFormat_t;
 
 /*
