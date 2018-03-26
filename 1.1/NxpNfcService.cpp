@@ -48,8 +48,7 @@ int main() {
     sp<INxpNfc> nxp_nfc_service = new NxpNfc();
     status = nxp_nfc_service->registerAsService();
     if (status != OK) {
-        LOG_ALWAYS_FATAL("Could not register service for NXP NFC Extn Iface (%d).", status);
-        return -1;
+        ALOGD("Could not register service for NXP NFC Extn Iface (%d).", status);
     }
     ALOGD("NFC service is ready");
     joinRpcThreadpool();
