@@ -33,10 +33,10 @@
 #include "spi_spm.h"
 
 using namespace android::hardware::nfc::V1_1;
+using android::hardware::nfc::V1_1::NfcEvent;
 
 /*********************** Global Variables *************************************/
 #define PN547C2_CLOCK_SETTING
-#undef PN547C2_FACTORY_RESET_DEBUG
 #define CORE_RES_STATUS_BYTE 3
 
 /* Processing of ISO 15693 EOF */
@@ -97,7 +97,8 @@ static void phNxpNciHal_kill_client_thread(
 static void* phNxpNciHal_client_thread(void* arg);
 static void phNxpNciHal_get_clk_freq(void);
 static void phNxpNciHal_set_clock(void);
-static void phNxpNciHal_check_factory_reset(void);
+static void phNxpNciHal_hci_network_reset(void);
+static NFCSTATUS phNxpNciHal_do_se_session_reset(void);
 static void phNxpNciHal_print_res_status(uint8_t* p_rx_data, uint16_t* p_len);
 static NFCSTATUS phNxpNciHal_CheckValidFwVersion(void);
 static void phNxpNciHal_enable_i2c_fragmentation();
@@ -219,6 +220,17 @@ static void* phNxpNciHal_client_thread(void* arg) {
         if (nxpncihal_ctrl.p_nfc_stack_cback != NULL) {
           /* Send the event */
           (*nxpncihal_ctrl.p_nfc_stack_cback)(HAL_NFC_PRE_DISCOVER_CPLT_EVT,
+                                              HAL_NFC_STATUS_OK);
+        }
+        REENTRANCE_UNLOCK();
+        break;
+      }
+
+      case NCI_HAL_HCI_NETWORK_RESET_MSG: {
+        REENTRANCE_LOCK();
+        if (nxpncihal_ctrl.p_nfc_stack_cback != NULL) {
+          /* Send the event */
+          (*nxpncihal_ctrl.p_nfc_stack_cback)((uint32_t)NfcEvent::HCI_NETWORK_RESET,
                                               HAL_NFC_STATUS_OK);
         }
         REENTRANCE_UNLOCK();
@@ -1242,6 +1254,9 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
       goto retry_core_init;
     }
 
+    if (fw_download_success == 1) {
+      phNxpNciHal_hci_network_reset();
+    }
 
   // Check if firmware download success
   status = phNxpNciHal_get_mw_eeprom();
@@ -1303,7 +1318,6 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
   }
 #endif
 
-  phNxpNciHal_check_factory_reset();
   retlen = 0;
   config_access = true;
   isfound = GetNxpByteArrayValue(NAME_NXP_NFC_PROFILE_EXTN, (char*)buffer,
@@ -2878,68 +2892,62 @@ void phNxpNciHal_enable_i2c_fragmentation() {
   }
 }
 /******************************************************************************
+ * Function         phNxpNciHal_do_se_session_reset
+ *
+ * Description      This function is called to set the session id to default
+ *                  value.
+ *
+ * Returns          NFCSTATUS.
+ *
+ ******************************************************************************/
+static NFCSTATUS phNxpNciHal_do_se_session_reset(void) {
+  static uint8_t reset_se_session_identity_set[] = {
+      0x20, 0x02, 0x17, 0x02, 0xA0, 0xEA, 0x08, 0xFF, 0xFF,
+      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xA0, 0xEB, 0x08,
+      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  NFCSTATUS status = phNxpNciHal_send_ext_cmd(sizeof(reset_se_session_identity_set),
+                                  reset_se_session_identity_set);
+  NXPLOG_NCIHAL_D("%s status = %x ",__func__, status);
+  return status;
+}
+/******************************************************************************
  * Function         phNxpNciHal_do_factory_reset
  *
- * Description      This function is called during factory reset to set
- *                  the session id to default value.
+ * Description      This function is called during factory reset to clear/reset
+ *                  nfc sub-system persistant data.
  *
  * Returns          void.
  *
  ******************************************************************************/
 void phNxpNciHal_do_factory_reset(void) {
-  NFCSTATUS status = NFCSTATUS_FAILED;
-  static uint8_t reset_ese_session_identity_set[] = {
-      0x20, 0x02, 0x17, 0x02, 0xA0, 0xEA, 0x08, 0xFF, 0xFF,
-      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xA0, 0xEB, 0x08,
-      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-      status = phNxpNciHal_send_ext_cmd(sizeof(reset_ese_session_identity_set),
-                                      reset_ese_session_identity_set);
-      if (status != NFCSTATUS_SUCCESS) {
-      NXPLOG_NCIHAL_E("NXP reset_ese_session_identity_set command failed");
-    }
+  NFCSTATUS status = phNxpNciHal_do_se_session_reset();
+  if (status != NFCSTATUS_SUCCESS) {
+    NXPLOG_NCIHAL_E("%s failed. status = %x ",__func__, status);
+  }
 }
 /******************************************************************************
- * Function         phNxpNciHal_check_factory_reset
+ * Function         phNxpNciHal_hci_network_reset
  *
- * Description      This function is called at init time to check
- *                  the presence of ese related info. If file are not
- *                  present set the SWP_INT_SESSION_ID_CFG to FF to
- *                  force the NFCEE to re-run its initialization sequence.
+ * Description      This function resets the session id's of all the se's
+ *                  in the HCI network and notify to HCI_NETWORK_RESET event to
+ *                  NFC HAL Client.
  *
  * Returns          void.
  *
  ******************************************************************************/
-static void phNxpNciHal_check_factory_reset(void) {
-  NFCSTATUS status = NFCSTATUS_FAILED;
-  static uint8_t reset_ese_session_identity_set[] = {
-      0x20, 0x02, 0x17, 0x02, 0xA0, 0xEA, 0x08, 0xFF, 0xFF,
-      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xA0, 0xEB, 0x08,
-      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-#ifdef PN547C2_FACTORY_RESET_DEBUG
-  static uint8_t reset_ese_session_identity[] = {0x20, 0x03, 0x05, 0x02,
-                                                 0xA0, 0xEA, 0xA0, 0xEB};
-#endif
-#ifdef PN547C2_FACTORY_RESET_DEBUG
-    /* NXP ACT Proprietary Ext */
-    status = phNxpNciHal_send_ext_cmd(sizeof(reset_ese_session_identity),
-                                      reset_ese_session_identity);
-    if (status != NFCSTATUS_SUCCESS) {
-      NXPLOG_NCIHAL_E("NXP reset_ese_session_identity command failed");
-    }
-#endif
-    status = phNxpNciHal_send_ext_cmd(sizeof(reset_ese_session_identity_set),
-                                      reset_ese_session_identity_set);
-    if (status != NFCSTATUS_SUCCESS) {
-      NXPLOG_NCIHAL_E("NXP reset_ese_session_identity_set command failed");
-    }
-#ifdef PN547C2_FACTORY_RESET_DEBUG
-    /* NXP ACT Proprietary Ext */
-    status = phNxpNciHal_send_ext_cmd(sizeof(reset_ese_session_identity),
-                                      reset_ese_session_identity);
-    if (status != NFCSTATUS_SUCCESS) {
-      NXPLOG_NCIHAL_E("NXP reset_ese_session_identity command failed");
-    }
-#endif
+static void phNxpNciHal_hci_network_reset(void) {
+  static phLibNfc_Message_t msg;
+  msg.pMsgData = NULL;
+  msg.Size = 0;
+
+  NFCSTATUS status = phNxpNciHal_do_se_session_reset();
+
+  if (status != NFCSTATUS_SUCCESS) {
+    msg.eMsgType = NCI_HAL_ERROR_MSG;
+  } else {
+    msg.eMsgType = NCI_HAL_HCI_NETWORK_RESET_MSG;
+  }
+  phTmlNfc_DeferredCall(gpphTmlNfc_Context->dwCallbackThreadId, &msg);
 }
 
 /*******************************************************************************
