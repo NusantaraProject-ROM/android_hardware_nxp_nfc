@@ -188,7 +188,7 @@ void EseAdaptation::InitializeHalDeviceContext() {
   ALOGD_IF(nfc_debug_enabled, "%s: enter", func);
   ALOGD_IF(nfc_debug_enabled, "%s: INxpEse::tryGetService()", func);
   mHalNxpEse = INxpEse::tryGetService();
-  LOG_FATAL_IF(mHalNxpEse == nullptr, "Failed to retrieve the NXP ESE HAL!");
+  ALOGD_IF(mHalNxpEse == nullptr, "%s: Failed to retrieve the NXP ESE HAL!", func);
   if(mHalNxpEse != nullptr) {
     ALOGD_IF(nfc_debug_enabled, "%s: INxpEse::getService() returned %p (%s)",
              func, mHalNxpEse.get(),
