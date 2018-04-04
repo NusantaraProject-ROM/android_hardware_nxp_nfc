@@ -2920,7 +2920,15 @@ static NFCSTATUS phNxpNciHal_do_se_session_reset(void) {
  *
  ******************************************************************************/
 void phNxpNciHal_do_factory_reset(void) {
-  NFCSTATUS status = phNxpNciHal_do_se_session_reset();
+  NFCSTATUS status = NFCSTATUS_FAILED;
+  if (nxpncihal_ctrl.halStatus == HAL_STATUS_CLOSE) {
+    status = phNxpNciHal_MinOpen();
+    if (status != NFCSTATUS_SUCCESS ) {
+      NXPLOG_NCIHAL_E("%s: NXP Nfc Open failed", __func__);
+      return;
+    }
+  }
+  status = phNxpNciHal_do_se_session_reset();
   if (status != NFCSTATUS_SUCCESS) {
     NXPLOG_NCIHAL_E("%s failed. status = %x ",__func__, status);
   }
