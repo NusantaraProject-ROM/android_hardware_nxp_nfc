@@ -49,6 +49,9 @@ static uint8_t fw_download_success = 0;
 
 static uint8_t config_access = false;
 static uint8_t config_success = true;
+
+static bool persist_uicc_enabled =false;
+
 /* NCI HAL Control structure */
 phNxpNciHal_Control_t nxpncihal_ctrl;
 
@@ -112,6 +115,7 @@ static void phNxpNciHal_initialize_debug_enabled_flag();
 NFCSTATUS phNxpNciHal_nfcc_core_reset_init();
 static NFCSTATUS phNxpNciHalRFConfigCmdRecSequence();
 static NFCSTATUS phNxpNciHal_CheckRFCmdRespStatus();
+static void phNxpNciHal_getPersistUiccSetting();
 int check_config_parameter();
 /******************************************************************************
  * Function         phNxpNciHal_initialize_debug_enabled_flag
@@ -1523,6 +1527,19 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
       }
     }
 
+    static uint8_t cmd_set_EE[] = {0x20, 0x02, 0x09, 0x02, 0xA0, 0x0EC,
+                                0x01, 0x00, 0xA0, 0xED, 0x01, 0x01};
+    if (persist_uicc_enabled) {
+      cmd_set_EE[7] = 0x01;
+      cmd_set_EE[11] = 0x00;
+    }
+    status = phNxpNciHal_send_ext_cmd(sizeof(cmd_set_EE), cmd_set_EE);
+    if (status != NFCSTATUS_SUCCESS) {
+      NXPLOG_NCIHAL_E("NXP configure UICC/eSE failed.");
+      retry_core_init_cnt++;
+      goto retry_core_init;
+    }
+
     retlen = 0;
     config_access = false;
     isfound = GetNxpByteArrayValue(NAME_NXP_CORE_RF_FIELD, (char*)buffer,
@@ -2100,6 +2117,8 @@ void phNxpNciHal_getVendorConfig(NfcConfig& config) {
   long retlen = 0;
   memset(&config, 0x00, sizeof(NfcConfig));
 
+  phNxpNciHal_getPersistUiccSetting();
+
   config.nfaPollBailOutMode = true;
   if (GetNxpNumValue(NAME_ISO_DEP_MAX_TRANSCEIVE, &num, sizeof(num))) {
     config.maxIsoDepTransceiveLength = num;
@@ -2109,6 +2128,10 @@ void phNxpNciHal_getVendorConfig(NfcConfig& config) {
   }
   if (GetNxpNumValue(NAME_DEFAULT_NFCF_ROUTE, &num, sizeof(num))) {
     config.defaultOffHostRouteFelica = num;
+  }
+  if (persist_uicc_enabled) {
+    //Overwrite Felica route to UICC
+    config.defaultOffHostRouteFelica = config.defaultOffHostRoute;
   }
   if (GetNxpNumValue(NAME_DEFAULT_SYS_CODE_ROUTE, &num, sizeof(num))) {
     config.defaultSystemCodeRoute = num;
@@ -2951,6 +2974,23 @@ void phNxpNciHal_configFeatureList(uint8_t* init_rsp, uint16_t rsp_len) {
     tNFC_chipType chipType = nxpncihal_ctrl.chipType;
     CONFIGURE_FEATURELIST(chipType);
     NXPLOG_NCIHAL_D("NFC_GetFeatureList ()chipType = %d", chipType);
+}
+
+/******************************************************************************
+ * Function         phNxpNciHal_getPersistUiccSetting
+ *
+ * Description      This function is called to get system property for persist uicc feature.
+ *
+ * Returns          void.
+ *
+ ******************************************************************************/
+void phNxpNciHal_getPersistUiccSetting() {
+  char valueStr[PROPERTY_VALUE_MAX] = {0};
+  int len = property_get("persist.nfc.uicc_enabled", valueStr, "false");
+  if (len > 0) {
+    persist_uicc_enabled = (len == 4 && (memcmp(valueStr, "true", len) == 0)) ? true : false;
+  }
+  NXPLOG_NCIHAL_D("persist_uicc_enabled : %d", persist_uicc_enabled);
 }
 
 /******************************************************************************
