@@ -296,15 +296,40 @@ static void phNxpNciHal_kill_client_thread(
  *
  * Returns          NFCSTATUS_SUCCESS if firmware download successful
  *                  NFCSTATUS_FAILED in case of failure
+ *                  NFCSTATUS_REJECTED if FW version is invalid or if hardware
+ *                                     criteria is not matching
  *
  ******************************************************************************/
 static NFCSTATUS phNxpNciHal_fw_download(void) {
-  NFCSTATUS status = NFCSTATUS_FAILED;
-  /*NCI_RESET_CMD*/
-  static uint8_t cmd_reset_nci[] = {0x20, 0x00, 0x01, 0x00};
-  phNxpNciHal_get_clk_freq();
-  status = phTmlNfc_IoCtl(phTmlNfc_e_EnableDownloadMode);
-  if (NFCSTATUS_SUCCESS == status) {
+  if (NFCSTATUS_SUCCESS != phNxpNciHal_CheckValidFwVersion()) {
+     return NFCSTATUS_REJECTED;
+  }
+
+  nfc_nci_IoctlInOutData_t data;
+  memset(&data, 0x00, sizeof(nfc_nci_IoctlInOutData_t));
+  data.inp.level = 0x03; // ioctl call arg value to get eSE power GPIO value = 0x03
+  int ese_gpio_value = phNxpNciHal_ioctl(HAL_NFC_GET_SPM_STATUS, &data);
+  NXPLOG_NCIHAL_D("eSE Power GPIO value = %d", ese_gpio_value);
+  if (ese_gpio_value != 0) {
+     NXPLOG_NCIHAL_E("FW download denied while SPI in use, Continue NFC init");
+     return NFCSTATUS_REJECTED;
+  }
+  nxpncihal_ctrl.phNxpNciGpioInfo.state = GPIO_UNKNOWN;
+  phNxpNciHal_gpio_restore(GPIO_STORE);
+
+  int fw_retry_count = 0;
+  NFCSTATUS status = NFCSTATUS_REJECTED;
+  NXPLOG_NCIHAL_D("Starting FW update");
+  do {
+    fw_download_success = 0;
+    phNxpNciHal_get_clk_freq();
+    status = phTmlNfc_IoCtl(phTmlNfc_e_EnableDownloadMode);
+    if (NFCSTATUS_SUCCESS != status) {
+      fw_retry_count++;
+      NXPLOG_NCIHAL_D("Retrying: FW download");
+      continue;
+    }
+
     if (nxpncihal_ctrl.bIsForceFwDwnld) {
       status = phNxpNciHal_getChipInfoInFwDnldMode();
       if (status != NFCSTATUS_SUCCESS) {
@@ -313,21 +338,55 @@ static NFCSTATUS phNxpNciHal_fw_download(void) {
       }
       nxpncihal_ctrl.bIsForceFwDwnld = false;
     }
+
     /* Set the obtained device handle to download module */
     phDnldNfc_SetHwDevHandle();
     NXPLOG_NCIHAL_D("Calling Seq handler for FW Download \n");
     status = phNxpNciHal_fw_download_seq(nxpprofile_ctrl.bClkSrcVal,
                                          nxpprofile_ctrl.bClkFreqVal);
     if (status != NFCSTATUS_SUCCESS) {
-      /* Abort any pending read and write */
-      phNxpNciHal_send_ext_cmd(sizeof(cmd_reset_nci), cmd_reset_nci);
-      phTmlNfc_ReadAbort();
-      phTmlNfc_WriteAbort();
+      fw_retry_count++;
+      NXPLOG_NCIHAL_D("Retrying: FW download");
     }
-    phDnldNfc_ReSetHwDevHandle();
+  } while((fw_retry_count < 3) && (status != NFCSTATUS_SUCCESS));
+
+  if (status != NFCSTATUS_SUCCESS) {
+    if (NFCSTATUS_SUCCESS != phNxpNciHal_fw_mw_ver_check()) {
+      NXPLOG_NCIHAL_D("Chip Version Middleware Version mismatch!!!!");
+      phOsalNfc_Timer_Cleanup();
+      phTmlNfc_Shutdown();
+      status = NFCSTATUS_FAILED;
+    } else {
+      NXPLOG_NCIHAL_E("FW download failed, Continue NFCC init");
+    }
   } else {
-    status = NFCSTATUS_FAILED;
+    status = NFCSTATUS_SUCCESS;
+    fw_download_success = 1;
   }
+
+  /*Keep Read Pending on I2C*/
+  NFCSTATUS readRestoreStatus = NFCSTATUS_FAILED;
+  readRestoreStatus = phTmlNfc_Read(
+      nxpncihal_ctrl.p_cmd_data, NCI_MAX_DATA_LEN,
+      (pphTmlNfc_TransactCompletionCb_t)&phNxpNciHal_read_complete, NULL);
+  if (readRestoreStatus != NFCSTATUS_PENDING) {
+    NXPLOG_NCIHAL_E("TML Read status error status = %x", readRestoreStatus);
+    readRestoreStatus = phTmlNfc_Shutdown();
+    if (readRestoreStatus != NFCSTATUS_SUCCESS) {
+      NXPLOG_NCIHAL_E("TML Shutdown failed. Status  = %x", readRestoreStatus);
+    }
+  }
+  phDnldNfc_ReSetHwDevHandle();
+
+  if (status == NFCSTATUS_SUCCESS) {
+    status = phNxpNciHal_nfcc_core_reset_init();
+    if (status == NFCSTATUS_SUCCESS) {
+      phNxpNciHal_gpio_restore(GPIO_RESTORE);
+    } else {
+      NXPLOG_NCIHAL_E("Failed to restore GPIO values!!!\n");
+    }
+  }
+
   return status;
 }
 
@@ -495,7 +554,6 @@ int phNxpNciHal_MinOpen (){
   resetNxpConfig();
 
   int init_retry_cnt = 0;
-  int fw_retry_count = 0;
   int8_t ret_val = 0x00;
 
   phNxpNciHal_initialize_debug_enabled_flag();
@@ -610,16 +668,16 @@ init_retry:
     goto clean_and_return;
   }
 
-  if(nxpncihal_ctrl.nci_info.nci_version == NCI_VERSION_2_0) {
+  if (nxpncihal_ctrl.nci_info.nci_version == NCI_VERSION_2_0) {
     status = phNxpNciHal_send_ext_cmd(sizeof(cmd_init_nci2_0), cmd_init_nci2_0);
   } else {
     status = phNxpNciHal_send_ext_cmd(sizeof(cmd_init_nci), cmd_init_nci);
-    if(status == NFCSTATUS_SUCCESS && (nfcFL.chipType == pn557)) {
+    if (status == NFCSTATUS_SUCCESS && (nfcFL.chipType == pn557)) {
       NXPLOG_NCIHAL_E("Chip is in NCI1.0 mode reset the chip to 2.0 mode");
       status = phNxpNciHal_send_ext_cmd(sizeof(cmd_reset_nci), cmd_reset_nci);
-      if(status == NFCSTATUS_SUCCESS) {
+      if (status == NFCSTATUS_SUCCESS) {
         status = phNxpNciHal_send_ext_cmd(sizeof(cmd_init_nci2_0), cmd_init_nci2_0);
-        if(status == NFCSTATUS_SUCCESS) {
+        if (status == NFCSTATUS_SUCCESS) {
           goto init_retry;
         }
       }
@@ -646,60 +704,18 @@ init_retry:
     NXPLOG_NCIHAL_D("FW update not required");
     phDnldNfc_ReSetHwDevHandle();
   } else {
-    nxpncihal_ctrl.phNxpNciGpioInfo.state = GPIO_UNKNOWN;
-    phNxpNciHal_gpio_restore(GPIO_STORE);
 force_download:
-    if (NFCSTATUS_SUCCESS == phNxpNciHal_CheckValidFwVersion()) {
-      NXPLOG_NCIHAL_D("FW update required");
-      fw_download_success = 0;
-      nfc_nci_IoctlInOutData_t data;
-      memset(&data, 0x00, sizeof(nfc_nci_IoctlInOutData_t));
-      data.inp.level = 0x03; /* ioctl call arg value to get eSE power GPIO value = 0x03  */
-      int ese_gpio_value = phNxpNciHal_ioctl(HAL_NFC_GET_SPM_STATUS, &data);
-      NXPLOG_NCIHAL_D("eSE Power GPIO value = %d", ese_gpio_value);
-      if(ese_gpio_value == 0) {
-        status = phNxpNciHal_fw_download();
-        if ((fw_retry_count < 3) && (status != NFCSTATUS_SUCCESS)) {
-          fw_retry_count++;
-          NXPLOG_NCIHAL_D("Retrying: FW download");
-          goto force_download;
-        }
-        else if (status != NFCSTATUS_SUCCESS) {
-          if (NFCSTATUS_SUCCESS != phNxpNciHal_fw_mw_ver_check()) {
-            NXPLOG_NCIHAL_D("Chip Version Middleware Version mismatch!!!!");
-            phOsalNfc_Timer_Cleanup();
-            phTmlNfc_Shutdown();
-            wConfigStatus = NFCSTATUS_FAILED;
-            goto clean_and_return;
-          } else {
-            NXPLOG_NCIHAL_E("FW download failed, Continue NFCC init");
-          }
-        } else {
-          wConfigStatus = NFCSTATUS_SUCCESS;
-          fw_download_success = 1;
-        }
-          /* call read pending */
-        status = phTmlNfc_Read(
-          nxpncihal_ctrl.p_cmd_data, NCI_MAX_DATA_LEN,
-          (pphTmlNfc_TransactCompletionCb_t)&phNxpNciHal_read_complete, NULL);
-        if (status != NFCSTATUS_PENDING) {
-          NXPLOG_NCIHAL_E("TML Read status error status = %x", status);
-          wConfigStatus = phTmlNfc_Shutdown();
-          wConfigStatus = NFCSTATUS_FAILED;
-          goto clean_and_return;
-        } else {
-          if (wFwVerRsp == 0) phDnldNfc_ReSetHwDevHandle();
-        }
-
-        status = phNxpNciHal_nfcc_core_reset_init();
-        if(status == NFCSTATUS_SUCCESS) {
-          phNxpNciHal_gpio_restore(GPIO_RESTORE);
-        } else {
-          NXPLOG_NCIHAL_E("Failed to restore GPIO values!!!\n");
-        }
-      } else {
-        NXPLOG_NCIHAL_E("FW download denied while SPI in use, Continue NFC init");
-      }
+    status = phNxpNciHal_fw_download();
+    if (NFCSTATUS_FAILED == status){
+      wConfigStatus = NFCSTATUS_FAILED;
+      goto clean_and_return;
+      NXPLOG_NCIHAL_D("FW download Failed");
+    } else if (NFCSTATUS_REJECTED == status) {
+      wConfigStatus = NFCSTATUS_SUCCESS;
+      NXPLOG_NCIHAL_D("FW download Rejected. Continuiing Nfc Init");
+    } else {
+      wConfigStatus = NFCSTATUS_SUCCESS;
+      NXPLOG_NCIHAL_D("FW download Success");
     }
   }
 
