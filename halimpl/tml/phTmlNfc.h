@@ -161,6 +161,7 @@ typedef struct phTmlNfc_Context {
   sem_t txSemaphore;      /* Lock/Aquire txRx Semaphore */
   sem_t postMsgSemaphore; /* Semaphore to post message atomically by Reader &
                              writer thread */
+  pthread_mutex_t readInfoUpdateMutex; /*Mutex to synchronize read Info update*/
 } phTmlNfc_Context_t;
 
 /*
@@ -218,6 +219,8 @@ NFCSTATUS phTmlNfc_Read(uint8_t* pBuffer, uint16_t wLength,
 NFCSTATUS phTmlNfc_WriteAbort(void);
 NFCSTATUS phTmlNfc_ReadAbort(void);
 NFCSTATUS phTmlNfc_IoCtl(phTmlNfc_ControlCode_t eControlCode);
+NFCSTATUS phTmlNfc_UpdateReadCompleteCallback (
+    pphTmlNfc_TransactCompletionCb_t pTmlReadComplete);
 void phTmlNfc_DeferredCall(uintptr_t dwThreadId,
                            phLibNfc_Message_t* ptWorkerMsg);
 void phTmlNfc_ConfigNciPktReTx(phTmlNfc_ConfigRetrans_t eConfig,
