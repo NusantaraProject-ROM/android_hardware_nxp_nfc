@@ -27,7 +27,8 @@
 #define FW_MOBILE_MAJOR_NUMBER_PN557 0x01
  using namespace std;
 typedef enum {
-  pn547C2 = 0x01,
+  unknown,
+  pn547C2,
   pn65T,
   pn548C2,
   pn66T,
