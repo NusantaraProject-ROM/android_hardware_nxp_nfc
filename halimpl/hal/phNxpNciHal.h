@@ -127,7 +127,7 @@ typedef struct phNxpNciHal_Control {
 
   /* to store and restore gpio values */
   phNxpNciGpioInfo_t phNxpNciGpioInfo;
-  tNFC_chipType chipType;
+  bool bIsForceFwDwnld;
 } phNxpNciHal_Control_t;
 
 typedef struct phNxpNciClock {
