@@ -32,22 +32,26 @@ capability* capability::getInstance() {
   return instance;
 }
 
-tNFC_chipType capability::processChipType(uint8_t* msg, uint16_t msg_len) {
+tNFC_chipType capability::getChipType(uint8_t* msg, uint16_t msg_len) {
   if ((msg != NULL) && (msg_len != 0)) {
-    if (msg[0] == 0x60 && msg[1] == 00) {
-      if ((msg[offsetRstFwVersion] == 0x12) &&
-          (msg[offsetRstFwVersion + 1] == 0x01)) {
-        chipType = pn81T;
-      } else if ((msg[offsetRstFwVersion] == 0x11) &&
-                 (msg[offsetRstFwVersion + 1] == 0x02)) {
-        chipType = pn553;
-      }
-    } else if ((offsetInitFwVersion < msg_len) &&
-               (msg[offsetInitFwVersion] == 0x12)) {
-      chipType = pn81T;
+    uint16_t offsetHwVersion = 0;
+    uint16_t offsetFwVersion = 0;
+
+    if (msg[0] == 0x60 && msg[1] == 0x00) {
+      /*CORE_RST_NTF*/
+      offsetHwVersion = offsetRstHwVersion;
+      offsetFwVersion = offsetRstFwVersion;
+    } else if (msg[0] == 0x40 && msg[1] == 0x01) {
+      /*CORE_INIT_RSP*/
+      offsetHwVersion = offsetInitHwVersion;
+      offsetFwVersion = offsetInitFwVersion;
+    } else if (msg[0] == 0x00 && msg[1] == 0x0A) {
+      /*Propreitary Response*/
+      offsetHwVersion = offsetPropHwVersion;
+      offsetFwVersion = offsetPropFwVersion;
     }
 
-    else if (offsetHwVersion < msg_len) {
+    if ((offsetHwVersion > 0) && (offsetHwVersion < msg_len)) {
       ALOGD("%s HwVersion : 0x%02x", __func__, msg[offsetHwVersion]);
       switch (msg[offsetHwVersion]) {
         case 0x40:  // PN553 A0
@@ -58,8 +62,20 @@ tNFC_chipType capability::processChipType(uint8_t* msg, uint16_t msg_len) {
 
         case 0x50:  // PN553 A0 + P73
         case 0x51:  // PN553 B0 + P73 , NQ440
-          // NQ330
-          chipType = pn80T;
+                    // NQ330
+                    // PN80T
+                    // PN81T
+          if (msg[offsetFwVersion] == 0x12) {
+            chipType = pn81T;
+          } else {
+            chipType = pn80T;
+          }
+          break;
+
+        case 0x61:
+          if (msg[offsetFwVersion] == 0x11) {
+            chipType = pn553;
+          }
           break;
 
         case 0x98:
@@ -85,7 +101,7 @@ tNFC_chipType capability::processChipType(uint8_t* msg, uint16_t msg_len) {
           chipType = pn80T;
       }
     } else {
-      ALOGD("%s Wrong msg_len. Setting Default ChiptType pn80T", __func__);
+      ALOGD("%s Wrong msg_len. Setting Default ChiptType pn81T", __func__);
       chipType = pn81T;
     }
   }
