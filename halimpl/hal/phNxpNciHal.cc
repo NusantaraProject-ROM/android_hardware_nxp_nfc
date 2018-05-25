@@ -1177,8 +1177,8 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
   uint8_t swp_full_pwr_mode_on_cmd[] = {0x20, 0x02, 0x05, 0x01,
                                         0xA0, 0xF1, 0x01, 0x01};
 
-  static uint8_t cmd_ven_enable[] = {0x20, 0x02, 0x05, 0x01,
-                                         0xA0, 0x07, 0x01, 0x01};
+  static uint8_t cmd_ven_pulld_enable_nci[] = {0x20, 0x02, 0x05, 0x01,
+                                               0xA0, 0x07, 0x01, 0x03};
 
   static uint8_t android_l_aid_matching_mode_on_cmd[] = {
       0x20, 0x02, 0x05, 0x01, 0xA0, 0x91, 0x01, 0x01};
@@ -1282,16 +1282,17 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
     }
   }
 
-  status = phNxpNciHal_send_ext_cmd(sizeof(cmd_ven_enable), cmd_ven_enable);
-    if (status != NFCSTATUS_SUCCESS) {
-      NXPLOG_NCIHAL_E("CMD_VEN_ENABLE: Failed");
-      retry_core_init_cnt++;
-      goto retry_core_init;
-    }
+  status = phNxpNciHal_send_ext_cmd(sizeof(cmd_ven_pulld_enable_nci),
+                                    cmd_ven_pulld_enable_nci);
+  if (status != NFCSTATUS_SUCCESS) {
+    NXPLOG_NCIHAL_E("cmd_ven_pulld_enable_nci: Failed");
+    retry_core_init_cnt++;
+    goto retry_core_init;
+  }
 
-    if (fw_download_success == 1) {
-      phNxpNciHal_hci_network_reset();
-    }
+  if (fw_download_success == 1) {
+    phNxpNciHal_hci_network_reset();
+  }
 
   // Check if firmware download success
   status = phNxpNciHal_get_mw_eeprom();
@@ -2088,39 +2089,6 @@ void phNxpNciHal_close_complete(NFCSTATUS status) {
  ******************************************************************************/
 int phNxpNciHal_configDiscShutdown(void) {
   NFCSTATUS status;
-  /*NCI_RESET_CMD*/
-  static uint8_t cmd_reset_nci[] = {0x20, 0x00, 0x01, 0x00};
-
-  static uint8_t cmd_disable_disc[] = {0x21, 0x06, 0x01, 0x00};
-
-  static uint8_t cmd_ce_disc_nci[] = {0x21, 0x03, 0x07, 0x03, 0x80,
-                                      0x01, 0x81, 0x01, 0x82, 0x01};
-
-  static uint8_t cmd_ven_pulld_enable_nci[] = {0x20, 0x02, 0x05, 0x01,
-                                         0xA0, 0x07, 0x01, 0x03};
-
-  CONCURRENCY_LOCK();
-
-  status = phNxpNciHal_send_ext_cmd(sizeof(cmd_disable_disc), cmd_disable_disc);
-  if (status != NFCSTATUS_SUCCESS) {
-    NXPLOG_NCIHAL_E("CMD_DISABLE_DISCOVERY: Failed");
-  }
-
-  status = phNxpNciHal_send_ext_cmd(sizeof(cmd_ven_pulld_enable_nci), cmd_ven_pulld_enable_nci);
-  if (status != NFCSTATUS_SUCCESS) {
-    NXPLOG_NCIHAL_E("CMD_VEN_PULLD_ENABLE_NCI: Failed");
-  }
-
-  status = phNxpNciHal_send_ext_cmd(sizeof(cmd_ce_disc_nci), cmd_ce_disc_nci);
-  if (status != NFCSTATUS_SUCCESS) {
-    NXPLOG_NCIHAL_E("CMD_CE_DISC_NCI: Failed");
-  }
-
-  status = phNxpNciHal_send_ext_cmd(sizeof(cmd_reset_nci), cmd_reset_nci);
-  if (status != NFCSTATUS_SUCCESS) {
-    NXPLOG_NCIHAL_E("NCI_CORE_RESET: Failed");
-  }
-  CONCURRENCY_UNLOCK();
 
   status = phNxpNciHal_close(true);
   if(status != NFCSTATUS_SUCCESS) {
