@@ -679,7 +679,7 @@ init_retry:
     /*If chipType is pn557 or PN81A(PN553_TC) and if the chip is in 1.0 mode,
       Force it to 2.0 mode. To confirm the PN553_TC/PN81A chip, FW version check
       is also added */
-    bool pn81A_pn553_chip = (nfcFL.chipType == pn553) && ((wFwVerRsp >> 8) & 0x1102);
+    bool pn81A_pn553_chip = (nfcFL.chipType == pn553) && ((wFwVerRsp >> 8 & 0xFFFF) == 0x1102);
     if ((status == NFCSTATUS_SUCCESS) && ((nfcFL.chipType == pn557) || pn81A_pn553_chip)) {
       NXPLOG_NCIHAL_E("Chip is in NCI1.0 mode reset the chip to 2.0 mode");
       status = phNxpNciHal_send_ext_cmd(sizeof(cmd_reset_nci), cmd_reset_nci);
