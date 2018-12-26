@@ -2076,7 +2076,11 @@ int phNxpNciHal_close(bool bShutdown) {
 
   CONCURRENCY_LOCK();
 
-
+  int sem_val;
+  sem_getvalue(&(nxpncihal_ctrl.syncSpiNfc), &sem_val);
+  if(sem_val == 0 ) {
+      sem_post(&(nxpncihal_ctrl.syncSpiNfc));
+  }
   if(!bShutdown){
     status = phNxpNciHal_send_ext_cmd(sizeof(cmd_ven_disable_nci), cmd_ven_disable_nci);
     if(status != NFCSTATUS_SUCCESS) {
