@@ -49,9 +49,6 @@ extern uint16_t wFwVer;
 
 uint16_t fw_maj_ver;
 uint16_t rom_version;
-/* local buffer to store CORE_INIT response */
-static uint32_t bCoreInitRsp[40];
-static uint32_t iCoreInitRspLen;
 
 extern uint32_t timeoutTimerId;
 
@@ -463,8 +460,6 @@ static NFCSTATUS phNxpNciHal_ext_process_nfc_init_rsp(uint8_t* p_ntf,
       wFwVerRsp = (((uint32_t)p_ntf[len - 2]) << 16U) |
                   (((uint32_t)p_ntf[len - 1]) << 8U) | p_ntf[len];
       if (wFwVerRsp == 0) status = NFCSTATUS_FAILED;
-      iCoreInitRspLen = *p_len;
-      memcpy(bCoreInitRsp, p_ntf, *p_len);
       NXPLOG_NCIHAL_D("NxpNci> FW Version: %x.%x.%x", p_ntf[len - 2],
                       p_ntf[len - 1], p_ntf[len]);
       fw_maj_ver = p_ntf[len - 1];
@@ -855,11 +850,6 @@ NFCSTATUS phNxpNciHal_write_ext(uint16_t* cmd_len, uint8_t* p_cmd_data,
     /* CORE_INIT */
     else if (p_cmd_data[0] == 0x20 && p_cmd_data[1] == 0x01 &&
              p_cmd_data[2] == 0x00) {
-      //            NXPLOG_NCIHAL_D("> Going - core init optimization");
-      //            *rsp_len = iCoreInitRspLen;
-      //            memcpy(p_rsp_data, bCoreInitRsp, iCoreInitRspLen);
-      //            status = NFCSTATUS_FAILED;
-      //            NXPLOG_NCIHAL_D("> Going - core init optimization - END");
     }
   }
 
