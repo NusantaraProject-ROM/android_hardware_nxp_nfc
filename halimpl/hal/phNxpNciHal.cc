@@ -3132,7 +3132,7 @@ void phNxpNciHal_configFeatureList(uint8_t* msg, uint16_t msg_len) {
  ******************************************************************************/
 void phNxpNciHal_getPersistUiccSetting() {
   char valueStr[PROPERTY_VALUE_MAX] = {0};
-  int len = property_get("persist.nfc.uicc_enabled", valueStr, "false");
+  int len = property_get("persist.vendor.nfc.uicc_enabled", valueStr, "false");
   if (len > 0) {
     persist_uicc_enabled = (len == 4 && (memcmp(valueStr, "true", len) == 0)) ? true : false;
   }
